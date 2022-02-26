@@ -1,6 +1,50 @@
-query="$1"
+#!/bin/sh
+
+# Usage:
+#   replace <from> <to> <string>
+replace() {
+    result=""
+    # Split string on what we want to replace and loop over the substrings
+    for i in `split "$3" "$1"`; do
+        # Join each substring with the replacement string as a prefix
+        result="$result$2$i"
+    done
+    # Strip the very first prefix
+    printf '%s\n' "${result##$2}"
+}
+
+# Usage:
+#   split <string> <delimiter>
+split() {
+    # Disable globbing
+    set -f
+    # Store current IFS
+    old_ifs=$IFS
+    # Change IFS to what we are splitting on
+    IFS=$2
+    # Create an argument list splitting at each
+    # occurance of '$2'.
+    #
+    # This is safe to disable as it just warns against
+    # word-splitting which is the behavior we expect.
+    # shellcheck disable=2086
+    set -- $1
+    # Print each string on it's own line
+    printf '%s\n' "$@"
+    # Restore old IFS
+    IFS=$old_ifs
+    # Re-enable globbing
+    set +f
+}
+
+query=$(replace " " "%20" "$1") # Escape spaces in query
 url="https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&redirects=1&titles=$query"
 
-result=`curl $url | jq -r '.query.pages[].extract'`
+result=$(curl -s $url)
+page=$(printf '%s' "$result" | jq '.query.pages[]')
 
-echo $result
+title=$(printf '%s\n' "$page" | jq -r '.title')
+extract=$(printf '%s\n' "$page" | jq -r '.extract')
+
+printf '\033[4m%s\033[m\n' "$title"
+printf '%s\n' "$extract"
